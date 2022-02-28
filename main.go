@@ -14,6 +14,8 @@ const (
 	timeoutStr = "-"
 )
 
+var filePath = "log.txt"
+
 type FailedServer struct {
 	ServerIP    string
 	FailedTime  time.Time
@@ -28,10 +30,12 @@ type Result struct {
 var res []Result
 
 func main() {
-	f, err := os.Open("log.txt")
+	f, err := os.Open(filePath)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer f.Close()
+
 	/* csvリーダーを生成 */
 	r := csv.NewReader(f)
 
