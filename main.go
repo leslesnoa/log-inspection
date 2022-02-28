@@ -9,20 +9,15 @@ import (
 	"time"
 )
 
-// var breakServer string
-// var recoverTime string
-// var breakStartTime string
-// var breakServers []string
-
 const (
 	dateFormat = "20060102150405"
 	timeoutStr = "-"
 )
 
 type FailedServer struct {
-	FailedTime  string
-	RecoverTime string
-	IsBreak     bool
+	ServerIP    string
+	FailedTime  time.Time
+	RecoverTime time.Time
 }
 
 type Result struct {
@@ -30,17 +25,17 @@ type Result struct {
 	FailedSpan time.Duration
 }
 
+var res []Result
+
 func main() {
 	f, err := os.Open("log.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	/* csvリーダーを生成 */
 	r := csv.NewReader(f)
 
 	failedServer := make(map[string]*FailedServer)
-	var res []Result
 
 	for {
 		/* 監視ログを行ごとに読み込む */
@@ -48,35 +43,30 @@ func main() {
 		if err == io.EOF {
 			break
 		}
-
 		if err != nil {
 			log.Fatal(err)
 		}
+		if len(record) != 3 {
+			log.Println("Error log file format is invalid.")
+			os.Exit(1)
+		}
 
 		/* 故障サーバを抽出・格納 */
-		confirmTime := record[0]
+		confirmTime := stringToTime(record[0])
 		serverIP := record[1]
 		serverResponse := record[2]
 
 		if serverResponse == timeoutStr {
-			if _, ok := failedServer[serverIP]; ok {
-				// failedServer[server].BreakCount += 1
-			} else {
+			// FailedServerに該当IPが無ければ追加する
+			if _, ok := failedServer[serverIP]; !ok {
 				failedServer[serverIP] = &FailedServer{
+					ServerIP:   serverIP,
 					FailedTime: confirmTime,
-					IsBreak:    true,
 				}
 			}
 		} else {
 			if _, ok := failedServer[serverIP]; ok {
-				// fmt.Printf("key exists. The value is %#v", val)
-				st := stringToTime(failedServer[serverIP].FailedTime)
-				et := stringToTime(confirmTime)
-				bt := et.Sub(st)
-				res = append(res, Result{
-					FailedHost: serverIP,
-					FailedSpan: bt,
-				})
+				failedServer[serverIP].SetFailedServerToResult(confirmTime)
 			}
 		}
 	}
@@ -87,7 +77,16 @@ func main() {
 	}
 }
 
+/* 監視ログのフォーマットで日時をTime型に変換する */
 func stringToTime(str string) time.Time {
 	t, _ := time.Parse(dateFormat, str)
 	return t
+}
+
+func (f *FailedServer) SetFailedServerToResult(c time.Time) {
+	bt := c.Sub(f.FailedTime)
+	res = append(res, Result{
+		FailedHost: f.ServerIP,
+		FailedSpan: bt,
+	})
 }
