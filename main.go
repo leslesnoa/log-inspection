@@ -12,14 +12,20 @@ import (
 const (
 	dateFormat = "20060102150405"
 	timeoutStr = "-"
+	trialCount = 3
 )
 
 var filePath = "log.txt"
+
+// var arg, _ = strconv.Atoi(os.Args[1])
+
+var failedServer = make(map[string]*FailedServer)
 
 type FailedServer struct {
 	ServerIP    string
 	FailedTime  time.Time
 	RecoverTime time.Time
+	FailedCount int32
 }
 
 type Result struct {
@@ -39,7 +45,7 @@ func main() {
 	/* csvリーダーを生成 */
 	r := csv.NewReader(f)
 
-	failedServer := make(map[string]*FailedServer)
+	// failedServer := make(map[string]*FailedServer)
 
 	for {
 		/* 監視ログを行ごとに読み込む */
@@ -61,16 +67,20 @@ func main() {
 		serverResponse := record[2]
 
 		if serverResponse == timeoutStr {
-			// FailedServerに該当IPが無ければ追加する
+			// 故障リストに該当IPが無ければ追加する
 			if _, ok := failedServer[serverIP]; !ok {
 				failedServer[serverIP] = &FailedServer{
-					ServerIP:   serverIP,
-					FailedTime: confirmTime,
+					ServerIP:    serverIP,
+					FailedTime:  confirmTime,
+					FailedCount: 1,
 				}
+			} else {
+				// 故障リストに該当IPが存在する場合、試行回数を1追加する
+				failedServer[serverIP].FailedCount += 1
 			}
 		} else {
 			if _, ok := failedServer[serverIP]; ok {
-				failedServer[serverIP].SetFailedServerToResult(confirmTime)
+				failedServer[serverIP].CheckFailedServer(confirmTime, trialCount)
 			}
 		}
 	}
@@ -87,10 +97,16 @@ func stringToTime(str string) time.Time {
 	return t
 }
 
-func (f *FailedServer) SetFailedServerToResult(c time.Time) {
-	bt := c.Sub(f.FailedTime)
-	res = append(res, Result{
-		FailedHost: f.ServerIP,
-		FailedSpan: bt,
-	})
+func (f *FailedServer) CheckFailedServer(c time.Time, count int32) {
+	/* N回以内にレスポンスがあった場合、故障リストから除外する */
+	if f.FailedCount < trialCount {
+		delete(failedServer, f.ServerIP)
+	}
+	if f.FailedCount >= count {
+		bt := c.Sub(f.FailedTime)
+		res = append(res, Result{
+			FailedHost: f.ServerIP,
+			FailedSpan: bt,
+		})
+	}
 }

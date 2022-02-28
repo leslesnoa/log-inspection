@@ -7,7 +7,7 @@ import (
 )
 
 func Test_main(t *testing.T) {
-	filePath = "test_log1"
+	filePath = "test_log1.txt"
 	main()
 	assert.Equal(t, 1, len(res))
 }
