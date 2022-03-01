@@ -15,10 +15,10 @@ const (
 	timeoutStr          = "-"
 	trialCount          = 3
 	confirmCount        = 3
-	averageResponseTime = 50
+	averageResponseTime = 1000
 )
 
-var filePath = "test_log3.txt"
+var filepath = "testlog1.txt"
 
 var failedServer = make(map[string]*FailedServer)
 
@@ -54,7 +54,7 @@ type Response struct {
 
 func main() {
 
-	f, err := os.Open(filePath)
+	f, err := os.Open(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
